@@ -2,6 +2,8 @@ import org.xiph.system.Bytes;
 
 import flash.Vector;
 import flash.external.ExternalInterface;
+import flash.events.Event;
+import flash.events.ProgressEvent;
 import org.xiph.fogg.SyncState;
 import org.xiph.fogg.StreamState;
 import org.xiph.fogg.Page;
@@ -69,12 +71,129 @@ class PAudioSink extends AudioSink {
     }
 }
 
+class AnMp3Player {
+    var mp3Sound:flash.media.Sound;
+    var mp3Request:flash.net.URLRequest;
+    var bIsPlaying: Bool;
+    var onProgress:flash.events.ProgressEvent -> Void;
+    var onID3:flash.events.Event -> Void;
+    var statusCB : String -> Void;
+    var bufferCB : Int -> Void;
+    var newSongCB: String -> Void;
+    var onError: flash.events.IOErrorEvent -> Void;
+    var volume: Int;
+    var sch:flash.media.SoundChannel;
+    var onSoundComplete:Event -> Void;
+    
+    function DoProgress(event:ProgressEvent):Void {
+    	if(mp3Sound.isBuffering)doBuffer(50)
+        else {
+      		if(!bIsPlaying){
+      			doBuffer(100);
+      			bIsPlaying=true;
+      			doStatus("playing");
+      		}	
+        }
+    }
+    
+    function doBuffer(value: Int) :Void {
+            if(bufferCB != null) bufferCB(value);
+    }
+    
+    
+    
+    
+    function doStatus(state: String) :Void {
+    	trace("mp3:"+state);
+            if(statusCB != null) statusCB(state);
+    }
+    
+    function DoSoundComplete(e:Event):Void {
+        bIsPlaying=false;
+        doStatus("stopped");
+    }
+    
+    function DoID3(event:Event):Void {
+    	var statstring: String;
+    	statstring = "Artist"+ "=\""+StringTools.replace(mp3Sound.id3.artist,"\"","\"\"")+"\";";
+    	statstring+="Title"+"=\""+StringTools.replace(mp3Sound.id3.songName,"\"","\"\"")+"\";";
+    	statstring+="Album"+"=\""+StringTools.replace(mp3Sound.id3.album,"\"","\"\"")+"\";";
+    	statstring+="Genre"+"=\""+StringTools.replace(mp3Sound.id3.genre,"\"","\"\"")+"\";";
+    	if(newSongCB != null) newSongCB(statstring);
+    }
+    
+    function DoError(event:flash.events.IOErrorEvent):Void {
+    	doStatus("error=ioerror");
+    	bIsPlaying=false;
+    }
+    
+    public function setNewSongCB(newCB : String -> Void): Void {
+            newSongCB = newCB;
+    }
+    //-----------------
+    public function setBufferCB(newCB : Int -> Void): Void {
+        bufferCB = newCB;
+    }
+        
+    
+    public function setStatusCB(newCB : String -> Void): Void {
+        statusCB = newCB;
+    }
+    
+    
+    public function new() {
+    	onProgress=DoProgress;
+    	onID3=DoID3;
+    	onError=DoError;
+    	onSoundComplete=DoSoundComplete;
+    	sch = null;
+    }
+    public function setVolume(vol:Int):Void {
+    	var strans:flash.media.SoundTransform;
+    	volume=vol;
+    	if(sch != null) {
+    		strans = sch.soundTransform;
+		strans.volume = (volume+0.0001)/100;
+    	   	sch.soundTransform = strans;
+    	}
+    
+    }
+    public function playMP3 ( murl:String):Void {
+        trace("playMP3: "+murl);
+        bIsPlaying = false;
+        mp3Request = new flash.net.URLRequest(murl);
+        mp3Sound = new flash.media.Sound();
+        mp3Sound.load(mp3Request);
+        mp3Sound.addEventListener(flash.events.ProgressEvent.PROGRESS, onProgress);
+        mp3Sound.addEventListener(Event.ID3, onID3);
+        mp3Sound.addEventListener(flash.events.IOErrorEvent.IO_ERROR, onError);
+        sch = mp3Sound.play(0,0);
+        sch.addEventListener(Event.SOUND_COMPLETE,onSoundComplete);
+        doStatus("buffering");
+        setVolume(volume);
+    }
+    
+    public function stopMP3() :Void {
+    	//trace(".mp3 stopping");
+    	//doStatus("stopped");
+    	bIsPlaying=false;
+    	if(sch!= null)sch.stop();
+    	
+    	trace(" mp3 stopped");
+    }
+    public function isPlaying(): Bool {
+    	return bIsPlaying;
+    }
+ 
+}
+
 /* ANOnymous-delivered Ogg Player for ANOma.fm :3 */
 class AnOggPlayer {
     var ul : flash.net.URLStream;
     var asink : PAudioSink;
     var url : String;
     var volume : Int;
+    var mp3player:AnMp3Player;
     
     // FIXME: find a better way to initialize those static bits?
     static function init_statics() : Void {
@@ -231,20 +350,42 @@ class AnOggPlayer {
     function _playURL ( murl:String ): Void {
     	trace("playURL: "+murl);
     	url=murl;
-    	_doState("buffering");
-    	ul.load(new flash.net.URLRequest(url));
+    	if(StringTools.endsWith(url,"ogg")||StringTools.endsWith(url,"OGG")||StringTools.endsWith(url,"Ogg")) {
+    		_doState("buffering");
+    		ul.load(new flash.net.URLRequest(url));
+    	}
+    	else if(StringTools.endsWith(url,"mp3")||StringTools.endsWith(url,"MP3")||StringTools.endsWith(url,"Mp3")) {
+    		_playMP3(murl);
+    	}
+    }
+    function _playMP3 (murl:String):Void {
+    	trace("playing mp3");
+    	mp3player = new AnMp3Player();
+    	mp3player.setNewSongCB(_doNewSong);
+    	mp3player.setStatusCB(_doState);
+    	mp3player.setBufferCB(_doBuffer);
+    	mp3player.playMP3(murl);
     }
     
     function _stopPlay() : Void {
     	trace("stopPlay!");
-    	asink.stop();
-    	ul.close();
+    	if(mp3player!=null){
+	    		trace("stopping mp3");
+	    		mp3player.stopMP3();
+	    		
+    	}
+    	if(asink!=null) {
+    		asink.stop();
+    		ul.close();
+    	}
+    	
     	_doState("stopped");
     }
     
     function _setVolume(vol: Int) : Void {
     	volume = vol;
     	if(asink!=null) asink.setVolume(vol);
+    	if(mp3player!=null)mp3player.setVolume(vol);
     }
     
     function _doState(state: String) : Void {
