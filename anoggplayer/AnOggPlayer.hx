@@ -110,6 +110,7 @@ class AnMp3Player {
     
     function DoSoundComplete(e:Event):Void {
         bIsPlaying=false;
+        trace("mp3 sound complete");
         doStatus("stopped");
     }
     
@@ -306,7 +307,8 @@ class AnOggPlayer {
 
     function _read_data() : Void {
         var to_read : Int = ul.bytesAvailable;
-        var chunk : Int = 8192;
+        //var chunk : Int = 8192;
+        var chunk : Int = 16384;//test?
         //trace("read_data: " + ul.bytesAvailable+" to read: "+to_read);
         read_pending = false;
 
@@ -340,7 +342,7 @@ class AnOggPlayer {
         dmx.set_packet_cb(-1, _proc_packet_head);
 
         //asink = new PAudioSink(8192, true, 132300);
-        asink = new PAudioSink(8192, true, 132300);
+        asink = new PAudioSink(8192, true, 132300);//params: data chunk for Sound.onSampleData, doFill with zeroes, trigger play after...
         asink.setBufferCB(_doBuffer);
         asink.setStatusCB(_doState);
         asink.setVolume(volume);
