@@ -115,17 +115,19 @@ class AudioSink {
         buffer.position = available * 8; // 2 ch * 4 bytes per sample (float)
         if (pcm.length == 1) {
             // one channel
+            //trace("1 chan");
             var c = pcm[0];
             var s : Float;
             i = index[0];
             end = i + samples;
-            while (i < samples) {
+            while (i < /*samples*/end) {
                 s = c[i++];
                 buffer.writeFloat(s);
                 buffer.writeFloat(s);
             }
         } else if (pcm.length == 2) {
             // two channels
+            //trace("2 chan");
             var c1 = pcm[0];
             var c2 = pcm[1];
             i = index[0];
