@@ -84,8 +84,16 @@ class AnMp3Player {
     var volume: Int;
     var sch:flash.media.SoundChannel;
     var onSoundComplete:Event -> Void;
+    var onProgressCB: Int -> Int -> Void;
+    var bytesLoaded: Int;
+    var bytesTotal: Int;
+    var bytesPlayed: Int;
+    var playTimer: haxe.Timer;
     
     function DoProgress(event:ProgressEvent):Void {
+    	bytesLoaded = event.bytesLoaded;
+    	bytesTotal = event.bytesTotal;
+    	doOnProgress(Math.ceil(bytesLoaded*100/bytesTotal),bytesPlayed);
     	if(mp3Sound.isBuffering)doBuffer(50)
         else {
       		if(!bIsPlaying){
@@ -100,8 +108,9 @@ class AnMp3Player {
             if(bufferCB != null) bufferCB(value);
     }
     
-    
-    
+    function doOnProgress(loaded: Int, played: Int): Void {
+    	if(onProgressCB != null) onProgressCB(loaded,played);
+    }
     
     function doStatus(state: String) :Void {
     	trace("mp3:"+state);
@@ -127,6 +136,14 @@ class AnMp3Player {
     	doStatus("error=ioerror");
     	bIsPlaying=false;
     }
+    function DoPlayTimer(): Void{
+        if(bIsPlaying)
+        {
+           if (sch !=null)bytesPlayed=Math.ceil(sch.position*100/ mp3Sound.length+1);
+           doOnProgress(Math.ceil(bytesLoaded*100/bytesTotal),bytesPlayed);
+        }
+    }
+
     
     public function setNewSongCB(newCB : String -> Void): Void {
             newSongCB = newCB;
@@ -135,7 +152,10 @@ class AnMp3Player {
     public function setBufferCB(newCB : Int -> Void): Void {
         bufferCB = newCB;
     }
-        
+     
+    public function setProgressCB(newCB: Int -> Int -> Void): Void{
+    	onProgressCB = newCB;
+    }
     
     public function setStatusCB(newCB : String -> Void): Void {
         statusCB = newCB;
@@ -148,6 +168,9 @@ class AnMp3Player {
     	onError=DoError;
     	onSoundComplete=DoSoundComplete;
     	sch = null;
+    	bytesPlayed=0;
+    	playTimer = new haxe.Timer(500);
+    	playTimer.run = DoPlayTimer;
     }
     public function setVolume(vol:Int):Void {
     	var strans:flash.media.SoundTransform;
@@ -195,7 +218,9 @@ class AnOggPlayer {
     var url : String;
     var volume : Int;
     var mp3player:AnMp3Player;
-    
+    var bytesTotal : Int;
+    var bytesLoaded : Int;
+    var bytesPlayed: Int;
     // FIXME: find a better way to initialize those static bits?
     static function init_statics() : Void {
         org.xiph.fogg.Buffer._s_init();
@@ -275,12 +300,12 @@ class AnOggPlayer {
                     j++;
                 };
                 _doNewSong(comments);
-		/*
+		
                 trace("Bitstream is " + vi.channels + " channel, " +
                       vi.rate + "Hz");
                 trace(("Encoded by: " +
                        System.fromBytes(vc.vendor, 0, vc.vendor.length - 1)) +
-                      "\n");*/
+                      "\n");
             }
 
             vd.synthesis_init(vi);
@@ -327,6 +352,8 @@ class AnOggPlayer {
         }
 
         dmx.read(ul, to_read);
+        bytesPlayed+=to_read;
+        _doProgress(Math.ceil(bytesLoaded*100/(bytesTotal+2)),Math.ceil(bytesPlayed*100/(bytesTotal+2)));
     }
 
     function try_ogg() : Void {
@@ -352,6 +379,7 @@ class AnOggPlayer {
     function _playURL ( murl:String ): Void {
     	trace("playURL: "+murl);
     	url=murl;
+    	bytesPlayed =0;
     	if(StringTools.endsWith(url,"ogg")||StringTools.endsWith(url,"OGG")||StringTools.endsWith(url,"Ogg")) {
     		_doState("buffering");
     		ul.load(new flash.net.URLRequest(url));
@@ -366,6 +394,7 @@ class AnOggPlayer {
     	mp3player.setNewSongCB(_doNewSong);
     	mp3player.setStatusCB(_doState);
     	mp3player.setBufferCB(_doBuffer);
+    	mp3player.setProgressCB(_doProgress);
     	mp3player.playMP3(murl);
     }
     
@@ -401,7 +430,11 @@ class AnOggPlayer {
     function _doNewSong(headers:String) : Void {
     	flash.external.ExternalInterface.call("onOggSongBegin",headers);
     }
-    
+   
+   function _doProgress(loaded:Int,played:Int):Void {
+   	flash.external.ExternalInterface.call("onOggProgress",loaded,played);
+   }
+   
     function start_request() : Void {
         trace("Starting downloading: " + url);
         
@@ -425,6 +458,9 @@ class AnOggPlayer {
 
     function _on_progress(e : flash.events.ProgressEvent) : Void {
         //trace("on_progress: " + ul.bytesAvailable);
+        bytesLoaded = e.bytesLoaded;
+        bytesTotal = e.bytesTotal;
+        _doProgress(Math.ceil(bytesLoaded*100/(bytesTotal+2)),Math.ceil(bytesPlayed*100/(bytesTotal+2)));
         if (!read_started && ul.bytesAvailable > 8192) {
             _read_data();
         }

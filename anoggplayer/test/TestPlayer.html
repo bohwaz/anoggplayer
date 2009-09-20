@@ -4,7 +4,10 @@
 <META HTTP-EQUIV="Content-Style-Type" CONTENT="text/css">
 <STYLE TYPE="text/css" MEDIA=screen>
 <!--
-
+.c0 {width:1px; height:1px; }
+.c2 {width:1px; height:1px; background:#707070 }
+.c1 {width:1px; height:1px; background:#000000 }
+.tbtn {cursor:pointer;float:left;}
 -->
 </STYLE>
 <!-- this is the volume button magic -->
@@ -71,9 +74,14 @@ function doSetDotPos(val)
 //play/stop command
 function doPlayStop()
 {
-	if ((oggStatus=="stopped") || (oggStatus=="loaded"))
+	if ((oggStatus=="stopped") || (oggStatus=="loaded") || (oggStatus=="streamstop"))
 	{
-		oggPlayURL('http://anoma.ch:3210/low.ogg');
+		//oggPlayURL('http://anoma.ch:3210/low.ogg');
+		//oggPlayURL('test001.ogg');
+		//oggPlayURL('peace.mp3');
+		 //oggPlayURL('http://noradio.freirad.at:8002/live.ogg');
+		//oggPlayURL('http://uploads.anoma.li/mp3/1240/12408249602539720.mp3');
+		oggPlayURL('http://uploads.anoma.li/mp3/1240/12408380006916310.mp3');
 		oggSetVolume(vVolume);
 	}
 	else if(oggStatus=="playing")oggStop();
@@ -191,8 +199,8 @@ function onOggState(str)
 	//"buffering" when stream begins to load
 	//"stopped" after stopPlay was called
 	//"playing" after oggPlayURL was called
-	//"streamstopped" after ogg stream/(or file if playing a file) ends
-
+	//"streamstop" after ogg stream/(or file if playing a file) ends
+	if(str == "streamstop")btnSetBufferState(0);
 	//"error=$text" after some error happens. Text may be "underflow", "ioerror","securerror", "badformat" or somesuch.
 	/*example handling*/
 	oggStatus=str;
@@ -205,6 +213,85 @@ function onOggBuffer(val)
 	//display.innerHTML=val;
 	btnSetBufferState(val);
 }
+function onOggProgress(loaded,played)
+{
+	//called by player?
+	var prgBar=document.getElementById("loadprogress");
+	var plyBar=document.getElementById("playposition");
+	prgBar.style.width=loaded;
+	plyBar.style.width=played;
+}
+
+var PlayBtn =[[2,2,2,2, 2,2,2,2, 2,2,2,2, 2,2,2,2],
+                        [2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2],
+                        [2,0,1,1,0,0,0,0,0,0,0,0,0,0,0,2],
+                        [2,0,1,1,1,1,0,0,0,0,0,0,0,0,0,2],
+
+                        [2,0,1,1,1,1,1,1,0,0,0,0,0,0,0,2],
+                        [2,0,1,1, 1,1,1,1, 1,1,0,0 ,0,0,0,2],
+                        [2,0,1,1, 1,1,1,1 ,1,1,1,1, 0,0,0,2],
+                        [2,0,1,1, 1,1,1,1 ,1,1,1,1, 1,1,0,2],
+
+                        [2,0,1,1, 1,1,1,1 ,1,1,1,1, 0,0,0,2],
+                        [2,0,1,1, 1,1,1,1, 1,1,0,0 ,0,0,0,2],
+                        [2,0,1,1,1,1,1,1,0,0,0,0,0,0,0,2],
+                        [2,0,1,1,1,1,0,0,0,0,0,0,0,0,0,2],
+
+                        [2,0,1,1,0,0,0,0,0,0,0,0,0,0,0,2],
+                        [2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2],
+                        [2,2,2,2, 2,2,2,2, 2,2,2,2, 2,2,2,2]];
+var PauseBtn =[[2,2,2,2, 2,2,2,2, 2,2,2,2, 2,2,2,2],
+                        [2,0,0,0, 0,0,0,0 ,0,0,0,0 ,0,0,0,2],
+                        [2,0,0,0,1,1,1,0, 0,1,1,1 ,0,0,0,2],
+                        [2,0,0,0, 1,1,1,0, 0,1,1,1 ,0,0,0,2],
+
+                        [2,0,0,0, 1,1,1,0, 0,1,1,1 ,0,0,0,2],
+                        [2,0,0,0, 1,1,1,0, 0,1,1,1 ,0,0,0,2],
+                        [2,0,0,0, 1,1,1,0, 0,1,1,1 ,0,0,0,2],
+                        [2,0,0,0, 1,1,1,0, 0,1,1,1 ,0,0,0,2],
+
+                        [2,0,0,0, 1,1,1,0, 0,1,1,1 ,0,0,0,2],
+                        [2,0,0,0, 1,1,1,0, 0,1,1,1 ,0,0,0,2],
+                        [2,0,0,0, 1,1,1,0, 0,1,1,1 ,0,0,0,2],
+                        [2,0,0,0, 1,1,1,0, 0,1,1,1 ,0,0,0,2],
+
+                        [2,0,0,0, 1,1,1,0, 0,1,1,1 ,0,0,0,2],
+                        [2,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,2],
+                        [2,2,2,2, 2,2,2,2, 2,2,2,2, 2,2,2,2]];
+function drawPlayButton()
+{
+	var i,j;
+	var contents="<table width=16px cellpadding=0 cellspacing=0 class='tbtn' onclick='drawPauseButton()'>";
+	for(i=0;i<15;i++){
+		contents+="<tr>";
+		for(j=0;j<16;j++){
+			contents+="<td class='c"+PlayBtn[i][j]+"'><\/td>";
+			//else contents+="<td class='c1'><\/td>";
+		}
+		contents+="<\/tr>";
+	}
+	contents+="<\/table>";
+	var mydiv=document.getElementById("controls");
+	mydiv.innerHTML=contents;
+}
+function drawPauseButton()
+{
+	var i,j;
+	var contents="<table width=16px cellpadding=0 cellspacing=0 class='tbtn' onclick='drawPlayButton()'>";
+	for(i=0;i<15;i++){
+		contents+="<tr>";
+		for(j=0;j<16;j++){
+			contents+="<td class='c"+PauseBtn[i][j]+"'><\/td>";
+			//else contents+="<td class='c1'><\/td>";
+		}
+		contents+="<\/tr>";
+	}
+	contents+="<\/table>";
+	var mydiv=document.getElementById("controls");
+	mydiv.innerHTML=contents;
+}
+
+
 </script>
 
 </head>
@@ -212,10 +299,10 @@ function onOggBuffer(val)
 
 <!-- this is the flash player -->
 <object classid="clsid:d27cdb6e-ae6d-11cf-96b8-444553540000"
-        width="0"
-    height="0"
+        width="400"
+    height="400"
     id="haxe"
-    align="middle" >
+    align="middle" style="position:absolute;left:400;top:150">
 <param name="movie" value="AnOgg.swf"/>
 <param name="allowScriptAccess" value="always" />
 <param name="wmmode" value="opaque" />
@@ -225,8 +312,8 @@ function onOggBuffer(val)
 <param name="bgcolor" value="#ffffff"/>
 <embed src="AnOgg.swf"
        bgcolor="#ffffff"
-       width="0"
-       height="0"
+       width="400"
+       height="400"
        name="haxe"
        wmmode="opaque"
        quality="high"
@@ -260,6 +347,15 @@ function onOggBuffer(val)
 <br></span>
 <span style="white-space:nowrap;">Headers: <span id="hdr" style="color:red;">--</span></span><br>
 Status: <span id="stt" style="color:green">--</span>
-
+<br>
+<div style='border: thin solid navy; width:100px; font-family:"Times New Roman",monospace;float:left' id='controls'>&nbsp;</div>
+<div style='border: thin solid black; width:100px; height:10px;float:left;'>
+	<div style='background-color:gray;width:70px;' id='loadprogress'>
+		<div style='border-right:thin solid yellow;width:60px;height:10px' id='playposition'>&nbsp;</div>
+	</div>
+</div>
+<script>
+drawPauseButton();
+</script>
 </body>
 </html>
