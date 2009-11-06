@@ -75,6 +75,7 @@ class AnMp3Player {
     var mp3Sound:flash.media.Sound;
     var mp3Request:flash.net.URLRequest;
     var bIsPlaying: Bool;
+    var nItfPlayMode: Int; //0=stop, 1=play, 2=pause
     var onProgress:flash.events.ProgressEvent -> Void;
     var onID3:flash.events.Event -> Void;
     var statusCB : String -> Void;
@@ -88,6 +89,7 @@ class AnMp3Player {
     var bytesLoaded: Int;
     var bytesTotal: Int;
     var bytesPlayed: Int;
+    var pausePos : Float;
     var playTimer: haxe.Timer;
     
     function DoProgress(event:ProgressEvent):Void {
@@ -97,9 +99,12 @@ class AnMp3Player {
     	if(mp3Sound.isBuffering)doBuffer(50)
         else {
       		if(!bIsPlaying){
-      			doBuffer(100);
-      			bIsPlaying=true;
-      			doStatus("playing");
+      			if(nItfPlayMode==1)
+      			{
+      				doBuffer(100);
+      				bIsPlaying=true;
+      				doStatus("playing");
+      			}
       		}	
         }
     }
@@ -121,6 +126,7 @@ class AnMp3Player {
         bIsPlaying=false;
         trace("mp3 sound complete");
         doStatus("stopped");
+        nItfPlayMode=0;
     }
     
     function DoID3(event:Event):Void {
@@ -135,6 +141,7 @@ class AnMp3Player {
     function DoError(event:flash.events.IOErrorEvent):Void {
     	doStatus("error=ioerror");
     	bIsPlaying=false;
+    	nItfPlayMode=0;
     }
     function DoPlayTimer(): Void{
         if(bIsPlaying)
@@ -171,6 +178,8 @@ class AnMp3Player {
     	bytesPlayed=0;
     	playTimer = new haxe.Timer(500);
     	playTimer.run = DoPlayTimer;
+    	nItfPlayMode = 0;
+    	pausePos=0;
     }
     public function setVolume(vol:Int):Void {
     	var strans:flash.media.SoundTransform;
@@ -184,6 +193,7 @@ class AnMp3Player {
     }
     public function playMP3 ( murl:String):Void {
         trace("playMP3: "+murl);
+        nItfPlayMode = 1;//play!
         bIsPlaying = false;
         mp3Request = new flash.net.URLRequest(murl);
         mp3Sound = new flash.media.Sound();
@@ -195,18 +205,56 @@ class AnMp3Player {
         sch.addEventListener(Event.SOUND_COMPLETE,onSoundComplete);
         doStatus("buffering");
         setVolume(volume);
+        pausePos=0;
     }
     
     public function stopMP3() :Void {
     	//trace(".mp3 stopping");
     	//doStatus("stopped");
     	bIsPlaying=false;
+    	nItfPlayMode = 0;
     	if(sch!= null)sch.stop();
-    	
+    	pausePos=0;
+    	try
+    	{
+    		mp3Sound.close();
+    	}catch (e:flash.errors.IOError){
+    		
+    	}
     	trace(" mp3 stopped");
+    }
+    
+    public function pauseMP3():Void{
+    	if(pausePos==0){//do pause
+    		if(sch!=null)
+    		{
+    			pausePos=sch.position;
+    			sch.stop();
+    			nItfPlayMode=2;
+    		}
+    	}else{
+    		sch=mp3Sound.play(pausePos);
+    		setVolume(volume);
+    		pausePos=0;
+    		nItfPlayMode=1;
+    		sch.addEventListener(Event.SOUND_COMPLETE,onSoundComplete);
+    	}
+    }
+    public function seekMp3(seekPos:Float):Int{
+    	var target_pos:Int =Math.ceil(mp3Sound.length*seekPos);
+    	target_pos=Math.ceil(Math.max(target_pos,1000));//from 1 sec
+    	var needResume:Bool =(pausePos==0);
+    	if(pausePos==0)pauseMP3();
+    	pausePos=target_pos;
+    	if(needResume)pauseMP3();
+    	return 1;
     }
     public function isPlaying(): Bool {
     	return bIsPlaying;
+    }
+    public function getPlayMode():Int
+    {
+    	return(nItfPlayMode);
     }
  
 }
@@ -221,6 +269,9 @@ class AnOggPlayer {
     var bytesTotal : Int;
     var bytesLoaded : Int;
     var bytesPlayed: Int;
+    var playBuffer:flash.utils.ByteArray;
+    var whatPlayer:Int;//0 for ogg, 1 for mp3;
+    var isPaused:Bool;
     // FIXME: find a better way to initialize those static bits?
     static function init_statics() : Void {
         org.xiph.fogg.Buffer._s_init();
@@ -242,7 +293,11 @@ class AnOggPlayer {
 
     var read_pending : Bool;
     var read_started : Bool;
-
+    var read_buff_pending: Bool;
+    var buff_write_pos:Int;
+    var play_buffered:Bool;//use buffer, don't set to true for streaming?
+    var streamDetected:Bool;//do NOT use buffer.
+    
     function _proc_packet_head(p : Packet, sn : Int) : DemuxerStatus {
         vi.init();
         vc.init();
@@ -350,12 +405,80 @@ class AnOggPlayer {
         if (to_read > chunk) {
             to_read = chunk;
         }
-
+	
+        /*this was here, now we read to buffer, not to demuxer
         dmx.read(ul, to_read);
         bytesPlayed+=to_read;
         _doProgress(Math.ceil(bytesLoaded*100/(bytesTotal+2)),Math.ceil(bytesPlayed*100/(bytesTotal+2)));
+        */
+        to_read=ul.bytesAvailable;
+        ul.readBytes(playBuffer,buff_write_pos,/*chunk*/to_read);
+        buff_write_pos+=to_read;
+       // bytesPlayed+=to_read;
     }
+    
+    function _read_buffer():Void{
+     	var to_read : Int = playBuffer.bytesAvailable;
+    	//var chunk : Int = 8192;
+    	var chunk : Int = 16384;//test?
+    	var did_read:Int=0;
+    	//trace("read_data: " + ul.bytesAvailable+" to read: "+to_read);
+    	read_buff_pending = false;
 
+    	if (to_read == 0)
+		return;
+
+    	if (to_read < chunk && !read_buff_pending) {
+		read_buff_pending = true;
+		haxe.Timer.delay(_read_buffer, 50);
+		return;
+    	}
+	/*else if(to_read<chunk && !play_buffered){
+		return;
+	}
+	*/
+    	to_read = playBuffer.bytesAvailable;
+    	if (to_read > chunk) {
+		to_read = chunk;
+    	}
+
+    	did_read=dmx.read(playBuffer, to_read);
+    	if(did_read==to_read)
+    	{
+    		bytesPlayed+=to_read;
+    		if((!play_buffered)||(streamDetected))
+    		{//kill off buffer
+    			
+    			/*
+    			buff_write_pos=playBuffer.bytesAvailable;
+    			System.bytescopy(playBuffer,playBuffer.position,playBuffer, 0, playBuffer.bytesAvailable);
+    			playBuffer.position=0;*/
+    			var tmp:flash.utils.ByteArray = new flash.utils.ByteArray();
+    			playBuffer.readBytes(tmp);
+    			playBuffer=tmp;
+    			buff_write_pos=playBuffer.length;
+    			
+    		}
+		_doProgress(Math.ceil(bytesLoaded*100/(bytesTotal+2)),Math.ceil(bytesPlayed*100/(bytesTotal+2)));    
+    	}
+    }
+    
+    function _seek_ogg(seek_pos:Float):Int {
+    	var target_pos,target_step:Int;
+    	target_pos=Math.ceil(bytesTotal*seek_pos);
+    	target_step=Math.ceil(Math.max(Math.ceil(target_pos/16384),3));
+    	target_pos=target_step*16384;
+    	if(playBuffer.length>target_pos){
+    		bytesPlayed=target_pos;
+    		playBuffer.position=target_pos;
+    		return 1;
+    	}
+    	else
+    	{
+    		return 0;
+    	}
+    }
+    
     function try_ogg() : Void {
         dmx = new Demuxer();
 
@@ -375,21 +498,32 @@ class AnOggPlayer {
         asink.setVolume(volume);
         asink.set_cb(88200, _on_data_needed);
     }
-    
+ //----------------------------------------------------------------   
     function _playURL ( murl:String ): Void {
     	trace("playURL: "+murl);
+    	playBuffer=new flash.utils.ByteArray();
+    	streamDetected=false;
+    	oldBytesTotal=0;//nothing loaded
+    	buff_write_pos=0;
     	url=murl;
     	bytesPlayed =0;
+    	isPaused=false;
     	if(StringTools.endsWith(url,"ogg")||StringTools.endsWith(url,"OGG")||StringTools.endsWith(url,"Ogg")) {
     		_doState("buffering");
     		ul.load(new flash.net.URLRequest(url));
+    		whatPlayer=0;//ogg
     	}
     	else if(StringTools.endsWith(url,"mp3")||StringTools.endsWith(url,"MP3")||StringTools.endsWith(url,"Mp3")) {
     		_playMP3(murl);
     	}
+    	else
+    	{
+    		_doState("error=unsupported_format");
+    	}
     }
     function _playMP3 (murl:String):Void {
     	trace("playing mp3");
+    	whatPlayer=1;//mp3
     	mp3player = new AnMp3Player();
     	mp3player.setNewSongCB(_doNewSong);
     	mp3player.setStatusCB(_doState);
@@ -397,22 +531,79 @@ class AnOggPlayer {
     	mp3player.setProgressCB(_doProgress);
     	mp3player.playMP3(murl);
     }
-    
+ //---------------------------------------------------   
     function _stopPlay() : Void {
     	trace("stopPlay!");
-    	if(mp3player!=null){
-	    		trace("stopping mp3");
-	    		mp3player.stopMP3();
-	    		
-    	}
-    	if(asink!=null) {
-    		asink.stop();
-    		ul.close();
-    	}
-    	
+    	isPaused=false;
+    	try {
+    		if(mp3player!=null){
+		    		trace("stopping mp3");
+		    		mp3player.stopMP3();
+		    		
+    		}
+    		if(asink!=null) {
+    			asink.stop();
+    			ul.close();
+    			playBuffer=null;
+    		}
+    	} catch( msg : String ) {
+		    trace("Error occurred: " + msg);
+	}
+    	whatPlayer=-1;
     	_doState("stopped");
     }
-    
+//----------------------------------------------------    
+    function _pausePlay() : Void {
+    	trace(whatPlayer);
+    	if(whatPlayer==0)
+    	{
+    		//ogg pause routine
+    		if(!isPaused){
+    			asink.stop();
+    			isPaused=true;
+    			_doState("paused");
+    		}
+    		else{
+    			asink.play();
+    			isPaused=false;
+    			_doState("playing");
+    		}
+    	}
+    	else if(whatPlayer==1)
+    	{
+    		//mp3 pause routine
+    		if(mp3player.getPlayMode()==2)
+    		{//unpause
+    			mp3player.pauseMP3();
+    			_doState("playing");
+    		}
+    		else
+    		{//pause
+    			mp3player.pauseMP3();
+    			_doState("paused");
+    		}
+    	}
+    }
+    //----------------------------------------------------
+    function _seekPlay(pos:Float): Void {
+    	if(whatPlayer==0)
+    	{
+    		asink.stop();
+    		if(_seek_ogg(pos)>0){
+    			asink.resetBuffer();
+    			_read_buffer();
+    			_read_buffer();
+    			_read_buffer();
+    		}
+    		asink.play();
+    	}
+    	else
+    	{
+    		mp3player.seekMp3(pos);
+    	}
+    	
+    }
+ //----------------------------------------------------   
     function _setVolume(vol: Int) : Void {
     	volume = vol;
     	if(asink!=null) asink.setVolume(vol);
@@ -420,6 +611,7 @@ class AnOggPlayer {
     }
     
     function _doState(state: String) : Void {
+    	if(state=="stopped")whatPlayer = -1;
     	flash.external.ExternalInterface.call("onOggState",state);
     }
     
@@ -432,6 +624,14 @@ class AnOggPlayer {
     }
    
    function _doProgress(loaded:Int,played:Int):Void {
+   	if(streamDetected)
+   	{
+   		loaded=100;
+   		if((whatPlayer==0)&&(asink!=null))
+   		{
+   			played=Math.ceil(asink.available*100/(132300*3));
+   		}
+   	}
    	flash.external.ExternalInterface.call("onOggProgress",loaded,played);
    }
    
@@ -455,17 +655,67 @@ class AnOggPlayer {
         read_started = false;
         try_ogg();
     }
-
+    var oldBytesTotal:Int;
+    var adjustCount:Int; 
+    var _bootstrap_pending:Bool;
+    
     function _on_progress(e : flash.events.ProgressEvent) : Void {
         //trace("on_progress: " + ul.bytesAvailable);
         bytesLoaded = e.bytesLoaded;
+        if(oldBytesTotal==0){
+        	_bootstrap_pending=false;
+        	read_started=false;
+        	oldBytesTotal=bytesTotal;
+        	if(adjustCount>3)adjustCount=0;
+        	if(!streamDetected)trace("adjust "+adjustCount+": size "+bytesTotal);
+        }
         bytesTotal = e.bytesTotal;
+        if((bytesTotal==0)&&(!streamDetected))
+        {
+        	adjustCount++;
+        	if(adjustCount>3)
+        	{
+        		trace("Microsoft idea of streaming detected :3");
+        		streamDetected=true;
+        	}
+        }
+        if(oldBytesTotal!=bytesTotal)
+        {
+        	oldBytesTotal=bytesTotal;
+        	if(!streamDetected)
+        	{
+        		adjustCount++;
+        		trace("adjust "+adjustCount+": size "+bytesTotal);
+        		if(adjustCount>10)
+        		{
+        			trace("streaming Ogg detected");
+        			streamDetected=true;
+        			adjustCount=0;
+        		}
+        	}
+        }
         _doProgress(Math.ceil(bytesLoaded*100/(bytesTotal+2)),Math.ceil(bytesPlayed*100/(bytesTotal+2)));
-        if (!read_started && ul.bytesAvailable > 8192) {
+        if (ul.bytesAvailable > 16284){
             _read_data();
+            if (!read_started ) {
+               //to fix immediate preload on ogg on IE 6
+                if(!_bootstrap_pending)_bootstrap_read();
+            }
         }
     }
-
+    //this functions hand-feeds audiosink new data until it starts playing on it's own
+    function _bootstrap_read():Void
+    {
+    	_bootstrap_pending=false;
+    	_read_buffer();//this function feeds the actual data
+    	if((!asink.triggered)&&(!_bootstrap_pending))
+    	{
+    		_bootstrap_pending=true;
+    		haxe.Timer.delay(_bootstrap_read, 50);
+    		return;
+    	}
+    	
+    }
     function _on_complete(e : flash.events.Event) : Void {
         //trace("Found ? pages with " + _packets + " packets.");
         trace("\n\n=====   Loading '" + url + "'done. Enjoy!   =====\n");
@@ -484,8 +734,8 @@ class AnOggPlayer {
     function _on_data_needed(s : PAudioSink) : Void {
          //trace("on_data: " + ul.bytesAvailable);
         read_started = true;
-        _read_data();
-      
+        //_read_data();
+      	_read_buffer();
     }
 
 
@@ -514,6 +764,8 @@ class AnOggPlayer {
 
     private function new(url : String) {
         this.url = url;
+        whatPlayer=-1;
+        play_buffered=true;
     }
 
     public static function main() : Void {
@@ -527,8 +779,10 @@ class AnOggPlayer {
             foe.volume=100;
             flash.system.Security.allowDomain("anoma.ch");
             flash.external.ExternalInterface.addCallback("playURL",foe._playURL);
-            flash.external.ExternalInterface.addCallback("stopPlay",foe._stopPlay);
+            flash.external.ExternalInterface.addCallback("stopPlaying",foe._stopPlay);
             flash.external.ExternalInterface.addCallback("setVolume",foe._setVolume);
+            flash.external.ExternalInterface.addCallback("pausePlay",foe._pausePlay);
+            flash.external.ExternalInterface.addCallback("Seek",foe._seekPlay);
             //foe._playURL("called from self");
             foe.start_request();
         } else {

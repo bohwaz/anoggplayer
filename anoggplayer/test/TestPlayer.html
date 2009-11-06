@@ -1,361 +1,47 @@
 <html>
 <head>
 <title>Testing Ogg player</title>
-<META HTTP-EQUIV="Content-Style-Type" CONTENT="text/css">
-<STYLE TYPE="text/css" MEDIA=screen>
-<!--
-.c0 {width:1px; height:1px; }
-.c2 {width:1px; height:1px; background:#707070 }
-.c1 {width:1px; height:1px; background:#000000 }
-.tbtn {cursor:pointer;float:left;}
--->
-</STYLE>
-<!-- this is the volume button magic -->
-<script language="JavaScript">
-var isIE;
-//image preloader (c)pizzjeno s internetov
-function MM_preloadImages()
-{ //v3.0
-	var d=document;
-	if(d.images)
-	{
-		if(!d.MM_p) d.MM_p=new Array();
-		var i,j=d.MM_p.length,a=MM_preloadImages.arguments;
-		for(i=0; i<a.length; i++)if (a[i].indexOf("#")!=0)
-		{
-			d.MM_p[j]=new Image;
-			d.MM_p[j++].src=a[i];
-		}
-	}
-}
-//buffering display
-function btnSetBufferState(val)
-{
-	var btn=document.getElementById("button");
-	if(val<=0)
-	{
-		btn.src="but_base.png";
-	}
-	else if(val<50)
-	{
-		btn.src="but_buf_25.png";
-	}
-	else if(val<75)
-	{
-			btn.src="but_buf_50.png";
-	}
-	else if(val<100)
-	{
-			btn.src="but_buf_75.png";
-	}
-	else
-	{
-			btn.src="but_play.png";
-	}
-}
-//volume button variables
-var dx=0;dy=0;vDown=false,vMoved=false;
-var cntX=43+8+16;//absolute position
-var cntY=26+78+168;
-var rad2=17*17;
-var vVolume=1;
-var oggStatus="";
+<link rel="stylesheet" type="text/css" href="player-style.css" />
+<script type="text/javascript" src="player-intf.js"></script>
 
-//display current volume
-function doSetDotPos(val)
-{
-	var angle=(1.2*Math.PI)*(1-(val/100));
-	var dotX=43+(12*Math.cos(angle))-3;
-	var dotY=26-(12*Math.sin(angle))-3;
-	var dotDiv=document.getElementById("button-dot");
-	dotDiv.style.top=dotY;
-	dotDiv.style.left=dotX;
-}
-//play/stop command
-function doPlayStop()
-{
-	if ((oggStatus=="stopped") || (oggStatus=="loaded") || (oggStatus=="streamstop"))
-	{
-		//oggPlayURL('http://anoma.ch:3210/low.ogg');
-		//oggPlayURL('test001.ogg');
-		//oggPlayURL('peace.mp3');
-		 //oggPlayURL('http://noradio.freirad.at:8002/live.ogg');
-		//oggPlayURL('http://uploads.anoma.li/mp3/1240/12408249602539720.mp3');
-		oggPlayURL('http://uploads.anoma.li/mp3/1240/12408380006916310.mp3');
-		oggSetVolume(vVolume);
-	}
-	else if(oggStatus=="playing")oggStop();
-}
-
-//mouse actions interpreters
-function onVolClickDown(event)
-{
-	if (event.preventDefault){
-		event.preventDefault();
-	}
-	else
-	{
-		event.returnValue=false;
-	}
-	var ax=event.clientX-cntX;
-	var ay=event.clientY-cntY;
-
-	if(((ax*ax)+(ay*ay))<rad2)
-	{
-		vDown=true;
-		vMoved=false;
-		dx=event.clientX;
-		dy=event.clientY;
-	}
-}
-function onVolMoved(event)
-{
-	if (event.preventDefault)event.preventDefault();//dont drag image
-	else event.returnValue=false;
-	if(vDown)
-	{
-		vMoved=true;
-		var dVol=(event.clientX-dx)*2;
-		var newVol=(vVolume+dVol);
-		if(newVol<0)newVol=0;
-		if(newVol>100)newVol=100;
-
-		oggSetVolume(newVol);
-		doSetDotPos(newVol);
-	}
-	return false;
-}
-function onVolClickUp(event)
-{
-
-	if(vDown)
-	{
-		vDown=false;
-		if(!vMoved) //its a click!
-		{
-			if((event.clientX==dx)&&(event.clientY==dy))doPlayStop();
-		}
-		else
-		{
-			var dVol=(event.clientX-dx)*2;
-			var newVol=(vVolume+dVol);
-			if(newVol<0)newVol=0;
-			if(newVol>100)newVol=100;
-			vVolume=newVol;
-			oggSetVolume(vVolume);
-			doSetDotPos(vVolume);
-		}
-		vMoved=false;
-	}
-}
-function onVolExit(event)
-{
-	if(vDown)
-	{
-			var ax=event.clientX-cntX;
-			var ay=event.clientY-cntY;
-			if(!(((ax*ax)+(ay*ay))<rad2))onVolClickUp(event);
-		}
-}
-
-
-
-// this is the JavaScript API
-
-function getFlashMovie(movieName) {
-	isIE = navigator.appName.indexOf("Microsoft") != -1;
-	return (isIE) ? window[movieName] : document[movieName];
-}
-function oggPlayURL(str)
-{
-
-	getFlashMovie("haxe").playURL(str);
-
-}
-function oggStop()
-{
-	getFlashMovie("haxe").stopPlay();
-	btnSetBufferState(0);
-}
-function oggSetVolume(val)
-{
-	getFlashMovie("haxe").setVolume(val);
-}
-
-function onOggSongBegin(str)
-{
-	//called once when new stream arrives.
-	//str is in the form 'tag="value";tag="value";' and contains the stream details.
-	/*example handling*/
-	var display = document.getElementById("hdr");
-	display.innerHTML=str;
-
-}
-function onOggState(str)
-{
-	//todo: error processing
-	//alert(str);
-	//"loaded" when player initially loads and is ready
-	//"buffering" when stream begins to load
-	//"stopped" after stopPlay was called
-	//"playing" after oggPlayURL was called
-	//"streamstop" after ogg stream/(or file if playing a file) ends
-	if(str == "streamstop")btnSetBufferState(0);
-	//"error=$text" after some error happens. Text may be "underflow", "ioerror","securerror", "badformat" or somesuch.
-	/*example handling*/
-	oggStatus=str;
-	var display = document.getElementById("stt");
-	display.innerHTML=str;
-}
-function onOggBuffer(val)
-{
-	//var display = document.getElementById("stt");
-	//display.innerHTML=val;
-	btnSetBufferState(val);
-}
-function onOggProgress(loaded,played)
-{
-	//called by player?
-	var prgBar=document.getElementById("loadprogress");
-	var plyBar=document.getElementById("playposition");
-	prgBar.style.width=loaded;
-	plyBar.style.width=played;
-}
-
-var PlayBtn =[[2,2,2,2, 2,2,2,2, 2,2,2,2, 2,2,2,2],
-                        [2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2],
-                        [2,0,1,1,0,0,0,0,0,0,0,0,0,0,0,2],
-                        [2,0,1,1,1,1,0,0,0,0,0,0,0,0,0,2],
-
-                        [2,0,1,1,1,1,1,1,0,0,0,0,0,0,0,2],
-                        [2,0,1,1, 1,1,1,1, 1,1,0,0 ,0,0,0,2],
-                        [2,0,1,1, 1,1,1,1 ,1,1,1,1, 0,0,0,2],
-                        [2,0,1,1, 1,1,1,1 ,1,1,1,1, 1,1,0,2],
-
-                        [2,0,1,1, 1,1,1,1 ,1,1,1,1, 0,0,0,2],
-                        [2,0,1,1, 1,1,1,1, 1,1,0,0 ,0,0,0,2],
-                        [2,0,1,1,1,1,1,1,0,0,0,0,0,0,0,2],
-                        [2,0,1,1,1,1,0,0,0,0,0,0,0,0,0,2],
-
-                        [2,0,1,1,0,0,0,0,0,0,0,0,0,0,0,2],
-                        [2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2],
-                        [2,2,2,2, 2,2,2,2, 2,2,2,2, 2,2,2,2]];
-var PauseBtn =[[2,2,2,2, 2,2,2,2, 2,2,2,2, 2,2,2,2],
-                        [2,0,0,0, 0,0,0,0 ,0,0,0,0 ,0,0,0,2],
-                        [2,0,0,0,1,1,1,0, 0,1,1,1 ,0,0,0,2],
-                        [2,0,0,0, 1,1,1,0, 0,1,1,1 ,0,0,0,2],
-
-                        [2,0,0,0, 1,1,1,0, 0,1,1,1 ,0,0,0,2],
-                        [2,0,0,0, 1,1,1,0, 0,1,1,1 ,0,0,0,2],
-                        [2,0,0,0, 1,1,1,0, 0,1,1,1 ,0,0,0,2],
-                        [2,0,0,0, 1,1,1,0, 0,1,1,1 ,0,0,0,2],
-
-                        [2,0,0,0, 1,1,1,0, 0,1,1,1 ,0,0,0,2],
-                        [2,0,0,0, 1,1,1,0, 0,1,1,1 ,0,0,0,2],
-                        [2,0,0,0, 1,1,1,0, 0,1,1,1 ,0,0,0,2],
-                        [2,0,0,0, 1,1,1,0, 0,1,1,1 ,0,0,0,2],
-
-                        [2,0,0,0, 1,1,1,0, 0,1,1,1 ,0,0,0,2],
-                        [2,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,2],
-                        [2,2,2,2, 2,2,2,2, 2,2,2,2, 2,2,2,2]];
-function drawPlayButton()
-{
-	var i,j;
-	var contents="<table width=16px cellpadding=0 cellspacing=0 class='tbtn' onclick='drawPauseButton()'>";
-	for(i=0;i<15;i++){
-		contents+="<tr>";
-		for(j=0;j<16;j++){
-			contents+="<td class='c"+PlayBtn[i][j]+"'><\/td>";
-			//else contents+="<td class='c1'><\/td>";
-		}
-		contents+="<\/tr>";
-	}
-	contents+="<\/table>";
-	var mydiv=document.getElementById("controls");
-	mydiv.innerHTML=contents;
-}
-function drawPauseButton()
-{
-	var i,j;
-	var contents="<table width=16px cellpadding=0 cellspacing=0 class='tbtn' onclick='drawPlayButton()'>";
-	for(i=0;i<15;i++){
-		contents+="<tr>";
-		for(j=0;j<16;j++){
-			contents+="<td class='c"+PauseBtn[i][j]+"'><\/td>";
-			//else contents+="<td class='c1'><\/td>";
-		}
-		contents+="<\/tr>";
-	}
-	contents+="<\/table>";
-	var mydiv=document.getElementById("controls");
-	mydiv.innerHTML=contents;
-}
-
-
-</script>
 
 </head>
-<body bgcolor="#dddddd" onLoad=MM_preloadImages('but_base.png','but_play.png','but_buf_25.png','but_buf_50.png','but_buf_75.png','but_dot.png','#582130974')	>
+<body bgcolor="#dddddd" >
 
-<!-- this is the flash player -->
-<object classid="clsid:d27cdb6e-ae6d-11cf-96b8-444553540000"
-        width="400"
-    height="400"
-    id="haxe"
-    align="middle" style="position:absolute;left:400;top:150">
-<param name="movie" value="AnOgg.swf"/>
-<param name="allowScriptAccess" value="always" />
-<param name="wmmode" value="opaque" />
-<param name="quality" value="high" />
-<param name="scale" value="noscale" />
-<param name="salign" value="lt" />
-<param name="bgcolor" value="#ffffff"/>
-<embed src="AnOgg.swf"
-       bgcolor="#ffffff"
-       width="400"
-       height="400"
-       name="haxe"
-       wmmode="opaque"
-       quality="high"
-       align="middle"
-       allowScriptAccess="always"
-       type="application/x-shockwave-flash"
-       pluginspage="http://www.macromedia.com/go/getflashplayer"
-/>
-</object>
-<!-- this is the image control -->
-<div id=radio-back style="position:absolute;left:8;top:78;">
-	<img src="anomafm.png">
-	<div id=button-back style="position:absolute;left:16;top:168;">
-		<img src="but_base.png" id="button" onmousedown="javascript:onVolClickDown(event)"
-		onmouseup="javascript:onVolClickUp(event)" onmousemove="javascript:onVolMoved(event)"
-		onmouseout="javascript:onVolExit(event)">
-		<div height="6" id=button-dot style="max-height:6px;position:absolute;left:30;top:30;background-color:yellow;">
-			<img src="but_dot.png" id="dot" onmousedown="javascript:onVolClickDown(event)"
-			onmouseup="javascript:onVolClickUp(event)" onmousemove="javascript:onVolMoved(event)"
-			onmouseout="javascript:onVolExit(event)" style="position:absolute">
-		</div>
-	</div>
+<div id='flplayer'></div>
+<script>
+initEvents();
+injectPlayerObject(document.getElementById("flplayer"));
+</script>
 
-</div>
-<!-- this is the remote control -->
-<span style="display:none"> <!-- hide it for now-->
-[<a href="javascript:void(0)" onclick="javascript:oggPlayURL('http://anoma.ch:3210/low.ogg')">Play Low</a>] -
-[<a href="javascript:void(0)" onclick="javascript:oggPlayURL('http://anoma.ch:3210/ultralow.ogg')">Play Ultralow</a>] -
-[<a href="javascript:void(0)" onclick="javascript:oggStop()">Stop test</a>] -
-[Volume: <a href="javascript:void(0)" onclick="javascript:oggSetVolume(10)">10%</a>|<a href="javascript:void(0)" onclick="javascript:oggSetVolume(50)">50%</a>|<a href="javascript:void(0)" onclick="javascript:oggSetVolume(100)">100%</a>]
-<br></span>
+
 <span style="white-space:nowrap;">Headers: <span id="hdr" style="color:red;">--</span></span><br>
 Status: <span id="stt" style="color:green">--</span>
 <br>
-<div style='border: thin solid navy; width:100px; font-family:"Times New Roman",monospace;float:left' id='controls'>&nbsp;</div>
-<div style='border: thin solid black; width:100px; height:10px;float:left;'>
-	<div style='background-color:gray;width:70px;' id='loadprogress'>
-		<div style='border-right:thin solid yellow;width:60px;height:10px' id='playposition'>&nbsp;</div>
-	</div>
+
+<div id='player1' class='intf_div'>
 </div>
+<br>
+<div id='player2' class='intf_div'>
+</div>
+<br>
+<div id='player3' class='intf_div'>
+</div>
+<br>
+
+
 <script>
-drawPauseButton();
+
+
+injectPlayerInterface(document.getElementById("player1"),"og1","test002.ogg");
+injectPlayerInterface(document.getElementById("player2"),"og2","test0010.ogg");
+injectPlayerInterface(document.getElementById("player3"),"mp1","Peace.mp3");
+
+
 </script>
+
+
+
+
 </body>
 </html>

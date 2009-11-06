@@ -13,7 +13,7 @@ import flash.events.SampleDataEvent;
 class AudioSink {
     var buffer : Bytes;
     public var available : Int;
-    var triggered : Bool;
+    public var triggered : Bool;
     var trigger : Int;
     var fill : Bool;
     var size : Int;
@@ -107,7 +107,12 @@ class AudioSink {
             //stop();
         }
     }
-
+    public function resetBuffer():Void
+    {
+    	buffer.position=0;
+    	buffer.length=0;
+    	available=0;
+    }
     public function write(pcm : Array<Vector<Float>>, index : Vector<Int>,
                           samples : Int) : Void {
         var i : Int;
