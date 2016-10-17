@@ -39,7 +39,7 @@ HX_FILES = 				\
 	VectorTools.hx
 
 AnOgg.swf: build.hxml AnOggPlayer.hx $(HX_FILES)
-	$(HAXE) -cp . build.hxml
+	$(HAXE) -cp . -swf-version 10 -swf-header 200:200:30:000000 build.hxml
 
 clean:
 	rm -f AnOgg.swf

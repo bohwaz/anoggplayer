@@ -22,16 +22,16 @@ class Demuxer {
     var og : Page;
     var op : Packet;
 
-    var streams : IntHash<StreamState>;
+    var streams : Map<Int,StreamState>;
     var bos_done : Bool;
 
-    var page_cbs : IntHash<Page -> Int -> DemuxerStatus>;
-    var packet_cbs : IntHash<Packet -> Int -> DemuxerStatus>;
+    var page_cbs : Map<Int,Page -> Int -> DemuxerStatus>;
+    var packet_cbs : Map<Int,Packet -> Int -> DemuxerStatus>;
 
     public function new() {
-        page_cbs = new IntHash();
-        packet_cbs = new IntHash();
-        streams = new IntHash();
+        page_cbs = new Map<Int,Page -> Int -> DemuxerStatus>();
+        packet_cbs = new Map<Int,Packet -> Int -> DemuxerStatus>();
+        streams = new Map<Int,StreamState>();
 
         bos_done = false;
 
@@ -122,11 +122,12 @@ class Demuxer {
 
         var os : StreamState = streams.get(sn);
         if (os == null) {
-            if (bos_done) {
+            /*if (bos_done) {
                 // unexpected new stream
                 trace("unexpected end of stream");
                 return -1;
-            }
+            }*/
+			bos_done = false;
             os = new StreamState();
             os.init(sn);
             streams.set(sn, os);
