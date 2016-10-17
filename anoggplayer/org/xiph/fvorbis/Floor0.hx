@@ -38,14 +38,14 @@ class Floor0 extends FuncFloor {
         info.ampdB = opb.read(8);
         info.numbooks = (opb.read(4) + 1);
         if ((((info.order < 1) || (info.rate < 1)) || (info.barkmap < 1)) || (info.numbooks < 1)) {
-            return;
+            return null;
         };
         // for-while;
         var j : Int = 0;
         while (j < info.numbooks) {
             info.books[j] = opb.read(8);
             if ((info.books[j] < 0) || (info.books[j] >= vi.books)) {
-                return;
+                return null;
             };
             j++;
         };
@@ -202,7 +202,7 @@ class Floor0 extends FuncFloor {
             if ((booknum != -1) && (booknum < info.numbooks)) {
                 var b : CodeBook = vb.vd.fullbooks[info.books[booknum]];
                 var last : Float = 0.;
-                if ((lsp == null) || (lsp.length < (look.m + 1))) {
+                if ((lsp == null) || (lsp.length < look.m + 1)) {
                     //lsp = new float[look.m + 1];
                     lsp = new Vector(look.m + 1, true);
                 }
@@ -218,7 +218,7 @@ class Floor0 extends FuncFloor {
                 var j : Int = 0;
                 while (j < look.m) {
                     if (b.decodev_set(lsp, j, vb.opb, b.dim) == -1) {
-                        return;
+                        return null;
                     };
                     j += b.dim;
                 };
@@ -237,7 +237,7 @@ class Floor0 extends FuncFloor {
                 return lsp;
             };
         };
-        return;
+        return null;
     }
 
     // modifiers: 

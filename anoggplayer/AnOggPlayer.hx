@@ -93,8 +93,8 @@ class AnMp3Player {
     var playTimer: haxe.Timer;
     
     function DoProgress(event:ProgressEvent):Void {
-    	bytesLoaded = event.bytesLoaded;
-    	bytesTotal = event.bytesTotal;
+    	bytesLoaded = cast(event.bytesLoaded,Int);
+    	bytesTotal = cast(event.bytesTotal,Int);
     	doOnProgress(Math.ceil(bytesLoaded*100/bytesTotal),bytesPlayed);
     	if(mp3Sound.isBuffering)doBuffer(50)
         else {
@@ -350,7 +350,7 @@ class AnOggPlayer {
                     };
                     comment = System.fromBytes(ptr[j], 0, ptr[j].length - 1).split("=");
                     comments = comments+comment[0];
-                    comments = comments +"=\""+StringTools.replace(comment[1],"\"","\"\"")+"\";";
+		    comments = comments +"=\""+StringTools.htmlEscape(StringTools.replace(comment[1],"\"","\"\""))+"\";";
                     trace(System.fromBytes(ptr[j], 0, ptr[j].length - 1));
                     j++;
                 };
@@ -468,7 +468,7 @@ class AnOggPlayer {
     	target_pos=Math.ceil(bytesTotal*seek_pos);
     	target_step=Math.ceil(Math.max(Math.ceil(target_pos/16384),3));
     	target_pos=target_step*16384;
-    	if(playBuffer.length>target_pos){
+    	if(playBuffer.length > cast(target_pos,UInt)){
     		bytesPlayed=target_pos;
     		playBuffer.position=target_pos;
     		return 1;
@@ -661,7 +661,7 @@ class AnOggPlayer {
     
     function _on_progress(e : flash.events.ProgressEvent) : Void {
         //trace("on_progress: " + ul.bytesAvailable);
-        bytesLoaded = e.bytesLoaded;
+        bytesLoaded = cast(e.bytesLoaded,Int);
         if(oldBytesTotal==0){
         	_bootstrap_pending=false;
         	read_started=false;
@@ -669,7 +669,7 @@ class AnOggPlayer {
         	if(adjustCount>3)adjustCount=0;
         	if(!streamDetected)trace("adjust "+adjustCount+": size "+bytesTotal);
         }
-        bytesTotal = e.bytesTotal;
+        bytesTotal = cast(e.bytesTotal,Int);
         if((bytesTotal==0)&&(!streamDetected))
         {
         	adjustCount++;
@@ -773,11 +773,11 @@ class AnOggPlayer {
             init_statics();
 	    
             var fvs : Dynamic<String> = flash.Lib.current.loaderInfo.parameters;
-            var url = fvs.playUrl == null ? "http://anoma.ch:3210/low.ogg" : fvs.playUrl;
+            var url = fvs.playUrl == null ? "http://comodino.org:8001/null.ogg" : fvs.playUrl;
 
             var foe = new AnOggPlayer(url);
             foe.volume=100;
-            flash.system.Security.allowDomain("anoma.ch");
+            flash.system.Security.allowDomain("*");
             flash.external.ExternalInterface.addCallback("playURL",foe._playURL);
             flash.external.ExternalInterface.addCallback("stopPlaying",foe._stopPlay);
             flash.external.ExternalInterface.addCallback("setVolume",foe._setVolume);

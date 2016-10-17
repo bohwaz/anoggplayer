@@ -58,20 +58,20 @@ class AudioSink {
         //strans.volume = (vol+0.0001)/100;
     	volume = vol;
     	if (sch != null) {
-    	   trace("Volume change:"+vol);
+    	   //trace("Volume change:"+vol);
     	   strans = sch.soundTransform;
     	   strans.volume = (volume+0.0001)/100;
     	   sch.soundTransform = strans;
     	}
     }
     public function play() : Void {
-        trace("adding callback");
+        //trace("adding callback");
         s.addEventListener("sampleData", _data_cb);
-        trace("playing");
+        //trace("playing");
         doStatus("playing");
         sch = s.play(0,0,strans);
         setVolume(volume);
-        trace(sch);
+        //trace(sch);
     }
 
     public function stop() : Void {
@@ -92,7 +92,7 @@ class AudioSink {
         }
         i = 0;
         if (missing > 0 && missing != size && fill) {
-            trace("samples data underrun: " + missing);
+            //trace("samples data underrun: " + missing);
             doStatus("error=underflow");
             while (i < missing) {
                 untyped {
@@ -102,7 +102,7 @@ class AudioSink {
                 i++;
             }
         } else if (missing > 0) {
-            trace("not enough data, stopping");
+            //trace("not enough data, stopping");
             doStatus("streamstop");
             //stop();
         }
@@ -151,7 +151,7 @@ class AudioSink {
         available += samples;
         if (!triggered && trigger > 0 && available > trigger) {
             triggered = true;
-            trace("triggered");
+            //trace("triggered");
             doBuffer(100);
             play();
         }

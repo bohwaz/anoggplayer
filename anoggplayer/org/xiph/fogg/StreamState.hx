@@ -56,7 +56,7 @@ class StreamState {
         }
         else {
             // for-while;
-            var i : Int = 0;
+            var i : UInt = 0;
             while (i < body_data.length) {
                 body_data[i] = 0;
                 i++;

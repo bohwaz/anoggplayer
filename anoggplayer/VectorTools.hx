@@ -97,7 +97,7 @@ class VectorTools {
             b = src.slice(src_pos, src_end);
         }
 
-        if (dst_pos + length < dst.length) {
+        if (cast(dst_pos + length,Int) < dst.length) {
             b = b.concat(dst.slice(dst_pos + length));
         }
 
@@ -118,7 +118,7 @@ class VectorTools {
             b = src.slice(src_pos, src_end);
         }
 
-        if (dst_pos + length < dst.length) {
+        if (cast(dst_pos + length,Int) < dst.length) {
             b = b.concat(dst.slice(dst_pos + length));
         }
 

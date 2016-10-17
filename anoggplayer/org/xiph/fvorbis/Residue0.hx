@@ -70,14 +70,14 @@ class Residue0 extends FuncResidue {
         };
         if (info.groupbook >= vi.books) {
             free_info(info);
-            return;
+            return null;
         };
         // for-while;
         var j : Int = 0;
         while (j < acc) {
             if (info.booklist[j] >= vi.books) {
                 free_info(info);
-                return;
+                return null;
             };
             j++;
         };
@@ -136,7 +136,7 @@ class Residue0 extends FuncResidue {
             while (k < dim) {
                 var deco : Int = Std.int(val / mult);
                 val -= (deco * mult);
-                mult /= look.parts;
+                mult=Math.round(mult / look.parts);
                 look.decodemap[j][k] = deco;
                 k++;
             };
